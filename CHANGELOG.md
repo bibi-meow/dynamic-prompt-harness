@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-04-13
+
+### Fixed
+- Removed redundant `hooks` field from `plugin.json`; `hooks/hooks.json` is auto-loaded by Claude Code and the explicit reference caused a "Duplicate hooks file detected" error on plugin load.
+
+### Changed
+- Translated ASPICE engineering record (sys.1–3, swe.2) to English.
+
 ## [0.1.0] - 2026-04-13
 
 ### Added
