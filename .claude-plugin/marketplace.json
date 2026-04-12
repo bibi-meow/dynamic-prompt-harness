@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "dynamic-prompt-harness",
+  "description": "Single-plugin marketplace hosting dynamic-prompt-harness (dph): a registry-driven hook dispatcher for Claude Code.",
+  "owner": {
+    "name": "bibi-meow"
+  },
+  "plugins": [
+    {
+      "name": "dynamic-prompt-harness",
+      "description": "A registry-driven hook dispatcher for Claude Code — composable deterministic harness via JSON-declared subprocess rules.",
+      "source": "./",
+      "category": "development",
+      "homepage": "https://github.com/bibi-meow/dynamic-prompt-harness"
+    }
+  ]
+}
