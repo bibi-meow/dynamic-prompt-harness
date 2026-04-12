@@ -1,172 +1,172 @@
 # SYS.2 System Requirements Analysis: dynamic-prompt-harness
 
-SYS.1（user-stories）から抽出した機能要件 / 非機能要件 / インターフェース要件 /
-制約条件。v0.1 スコープ。
+Functional requirements / non-functional requirements / interface requirements /
+constraints derived from SYS.1 (user-stories). v0.1 scope.
 
-## 1. 機能要件（FR）
+## 1. Functional Requirements (FR)
 
-### 1.1 配布・初期化
+### 1.1 Distribution / Initialization
 
-| ID | 要件 | 由来 US |
+| ID | Requirement | Source US |
 |---|---|---|
-| FR-001 | Claude Code plugin marketplace 経由で `/plugin install` による導入が可能 | A1 |
-| FR-002 | slash command（`/dph-init`）により、カレントプロジェクトの `.claude/dynamic-prompt-harness/` 配下に `registry.json`（空/雛形）と `harnesses/` ディレクトリを生成する | A2 |
-| FR-003 | plugin の `hooks.json` により dispatcher hook が PreToolUse / PostToolUse / UserPromptSubmit / PreCompact に自動登録される | A3 |
+| FR-001 | Installation via `/plugin install` through the Claude Code plugin marketplace is supported | A1 |
+| FR-002 | A slash command (`/dph-init`) generates `registry.json` (empty/template) and the `harnesses/` directory under `.claude/dynamic-prompt-harness/` in the current project | A2 |
+| FR-003 | The plugin's `hooks.json` automatically registers the dispatcher hook for PreToolUse / PostToolUse / UserPromptSubmit / PreCompact | A3 |
 
 ### 1.2 Dispatcher
 
-| ID | 要件 | 由来 US |
+| ID | Requirement | Source US |
 |---|---|---|
-| FR-010 | dispatcher は上記 4 トリガを単一エントリポイントで受信する | C1 |
-| FR-011 | dispatcher は起動時に `.claude/dynamic-prompt-harness/registry.json` を読み込む | B1 |
-| FR-012 | dispatcher は registry の各エントリを `trigger + tool + pattern` で粗フィルタし、合致したハーネスのみ subprocess 実行する | C2 |
-| FR-013 | dispatcher は合致ハーネスを `priority` 昇順で実行する。同一 priority の場合は registry 登録順とする | C3, B3 |
-| FR-014 | dispatcher はハーネス出力の `decision = deny` を検出した時点で後続ハーネスをスキップし、最終結果を `deny` として返す（短絡） | C3 |
-| FR-015 | dispatcher は `decision = hint` のメッセージを全件連結して 1 つの出力にまとめる | C4 |
-| FR-016 | dispatcher は個別ハーネスの異常終了（非ゼロ exit）/ 不正 JSON 出力を捕捉し、該当ハーネスをスキップして後続を継続する。ハング時の強制停止は行わず、Claude Code 側の hook timeout に委ねる | C5 |
-| FR-017 | dispatcher は捕捉した異常をログに記録する（タイムスタンプ / session_id / trigger / ハーネス名 / 原因 / exit code） | C5 |
-| FR-018 | dispatcher はログレベル（`debug` / `info` / `warn` / `error`）を環境変数 `DPH_LOG_LEVEL` または `registry.json` のトップレベル `log_level` で切り替えられる。既定は `info` | NFR-O |
+| FR-010 | The dispatcher receives the above 4 triggers through a single entry point | C1 |
+| FR-011 | On startup, the dispatcher loads `.claude/dynamic-prompt-harness/registry.json` | B1 |
+| FR-012 | The dispatcher performs coarse filtering of each registry entry by `trigger + tool + pattern`, and only runs matched harnesses as subprocesses | C2 |
+| FR-013 | The dispatcher executes matched harnesses in ascending `priority` order. Ties are resolved by registry declaration order | C3, B3 |
+| FR-014 | Upon detecting `decision = deny` from a harness, the dispatcher skips subsequent harnesses and returns the final result as `deny` (short-circuit) | C3 |
+| FR-015 | The dispatcher concatenates all `decision = hint` messages into a single output | C4 |
+| FR-016 | The dispatcher catches abnormal termination (non-zero exit) / malformed JSON output from individual harnesses, skips the offending harness, and continues with the rest. Forced termination on hang is not performed; this is delegated to the Claude Code hook timeout | C5 |
+| FR-017 | The dispatcher records caught anomalies in the log (timestamp / session_id / trigger / harness name / cause / exit code) | C5 |
+| FR-018 | The dispatcher log level (`debug` / `info` / `warn` / `error`) can be switched via the environment variable `DPH_LOG_LEVEL` or the top-level `log_level` field in `registry.json`. Default is `info` | NFR-O |
 
 ### 1.3 Registry
 
-| ID | 要件 | 由来 US |
+| ID | Requirement | Source US |
 |---|---|---|
-| FR-020 | registry.json は JSON Schema で validate される。不正時はエラーメッセージを stderr に出力し dispatcher 起動を中止する | B4 |
-| FR-021 | registry エントリは以下のフィールドを持つ: `name`（必須、一意）、`triggers`（必須、配列）、`tools`（任意、配列）、`pattern`（任意、regex 文字列）、`priority`（任意、整数、既定 100）、`enabled`（任意、bool、既定 true）。さらに `script` または `action` のいずれか一方を持つ（排他必須） | B1, B2, B3 |
-| FR-021a | `action` フィールドは宣言的ハーネスを表現する。形式: `{"on_match": "deny" / "allow" / "hint", "message": "<文字列>"}`。dispatcher は subprocess を起動せず、pattern 一致時にこの結果を直接返す | B5（宣言的拡張） |
-| FR-021b | `script` フィールドは独自実装ハーネスを表現する。形式: `.claude/dynamic-prompt-harness/harnesses/` 配下の相対パス。dispatcher は該当スクリプトを subprocess 実行する | B5 |
-| FR-022 | `enabled: false` のエントリは dispatcher から無視される | B2 |
+| FR-020 | `registry.json` is validated against a JSON Schema. On validation failure, an error message is written to stderr and dispatcher startup is aborted | B4 |
+| FR-021 | A registry entry has the following fields: `name` (required, unique), `triggers` (required, array), `tools` (optional, array), `pattern` (optional, regex string), `priority` (optional, integer, default 100), `enabled` (optional, bool, default true). In addition, it must have exactly one of `script` or `action` (mutually exclusive, required) | B1, B2, B3 |
+| FR-021a | The `action` field represents a declarative harness. Form: `{"on_match": "deny" / "allow" / "hint", "message": "<string>"}`. The dispatcher does not spawn a subprocess; on pattern match it returns this result directly | B5 (declarative extension) |
+| FR-021b | The `script` field represents a custom-implementation harness. Form: a relative path under `.claude/dynamic-prompt-harness/harnesses/`. The dispatcher executes the specified script as a subprocess | B5 |
+| FR-022 | Entries with `enabled: false` are ignored by the dispatcher | B2 |
 
-### 1.4 抽象化 I/O 契約
+### 1.4 Abstract I/O Contract
 
-| ID | 要件 | 由来 US |
+| ID | Requirement | Source US |
 |---|---|---|
-| FR-030 | ハーネスは stdin で抽象化入力 JSON を受け取る | B5, D2 |
-| FR-031 | 抽象化入力は `trigger`, `tool`, `tool_input`, `context` フィールドを持つ。`context` には hook 経由でしか取得できないベンダ提供パラメータ（`session_id`, `cwd`, `transcript_path`, `hook_event_name` 等）を dispatcher がそのまま載せて渡す。ハーネスは `context.session_id` 等で参照可能 | D2 |
-| FR-031a | dispatcher は Claude Code hook JSON の全フィールドのうち、抽象化 I/O に写像可能なものを `context` にパススルーする。ベンダ固有名（例: `hookSpecificOutput`）はそのままの名前でなく adapter が正規化した名前で格納する | D2, D3 |
-| FR-032 | ハーネスは stdout に抽象化出力 JSON を返す。フィールドは `decision`（必須、`allow` / `deny` / `hint`）、`message`（任意）、`metadata`（任意、辞書） | B5 |
-| FR-033 | ハーネス側では任意言語の実装が許容される（stdin/stdout 契約遵守が条件） | B5 |
+| FR-030 | Harnesses receive the abstract input JSON on stdin | B5, D2 |
+| FR-031 | The abstract input has the fields `trigger`, `tool`, `tool_input`, `context`. `context` carries vendor-provided parameters obtainable only through the hook (`session_id`, `cwd`, `transcript_path`, `hook_event_name`, etc.), passed through by the dispatcher as-is. Harnesses can reference `context.session_id` and the like | D2 |
+| FR-031a | Of all Claude Code hook JSON fields, the dispatcher passes through those mappable to the abstract I/O into `context`. Vendor-specific names (e.g. `hookSpecificOutput`) are stored under names normalized by the adapter, not under their original names | D2, D3 |
+| FR-032 | Harnesses return the abstract output JSON on stdout. Fields: `decision` (required, `allow` / `deny` / `hint`), `message` (optional), `metadata` (optional, dict) | B5 |
+| FR-033 | Harnesses may be implemented in any language (subject to compliance with the stdin/stdout contract) | B5 |
 
 ### 1.5 Adapter
 
-| ID | 要件 | 由来 US |
+| ID | Requirement | Source US |
 |---|---|---|
-| FR-040 | Claude Code 固有の hook JSON（入出力）と抽象化 I/O の変換は adapter 層に閉じ込められる | C6, D1 |
-| FR-041 | ベンダ固有拡張フィールド（Claude Code の `hookSpecificOutput` 等）は抽象化出力の `metadata` 経由で表現可能。adapter がベンダ固有フィールドにマッピングする | D3 |
-| FR-042 | 将来のベンダ追加は `adapters/<vendor>.py` の新規追加で完結する設計とする（既存 core / ハーネスを変更しない） | D1 |
+| FR-040 | Conversion between the Claude Code-specific hook JSON (I/O) and the abstract I/O is confined to the adapter layer | C6, D1 |
+| FR-041 | Vendor-specific extension fields (such as Claude Code's `hookSpecificOutput`) can be expressed via `metadata` in the abstract output. The adapter maps them to the vendor-specific fields | D3 |
+| FR-042 | Adding a future vendor is designed to be completed solely by adding `adapters/<vendor>.py` (without modifying existing core / harnesses) | D1 |
 
-### 1.6 具象ハーネス動作（パターン表現可能性）
+### 1.6 Concrete Harness Behavior (Pattern Expressibility)
 
-v0.1 スコープの 6 パターンが抽象化 I/O のみで表現可能であること。
+The 6 patterns in v0.1 scope must be expressible using only the abstract I/O.
 
-| ID | パターン | 要件 | 由来 US |
+| ID | Pattern | Requirement | Source US |
 |---|---|---|---|
-| FR-050 | Gate | **宣言的で表現可能**。`action = {on_match: deny, message: ...}` | E1 |
-| FR-051 | Guide | **宣言的で表現可能**。`action = {on_match: hint, message: ...}` | E2 |
-| FR-052 | Validator | PostToolUse トリガ。単純ケースは宣言的、出力内容を動的に検査する場合は `script` | E3 |
-| FR-053 | Guard | PreToolUse。前提条件が外部状態に依存しなければ宣言的、依存する場合は `script` | E4 |
-| FR-054 | Circuit Breaker | カウンタ永続化が必要なため `script` 必須。ハーネス内で独自実装 | E5 |
-| FR-055 | Monitor | PostToolUse で副作用のみ。ログ出力等はハーネス内実装が必要、原則 `script` | E6 |
+| FR-050 | Gate | **Expressible declaratively.** `action = {on_match: deny, message: ...}` | E1 |
+| FR-051 | Guide | **Expressible declaratively.** `action = {on_match: hint, message: ...}` | E2 |
+| FR-052 | Validator | PostToolUse trigger. Simple cases are declarative; when inspecting output content dynamically, use `script` | E3 |
+| FR-053 | Guard | PreToolUse. Declarative when preconditions do not depend on external state; `script` otherwise | E4 |
+| FR-054 | Circuit Breaker | Requires counter persistence, so `script` is mandatory. Implemented inside the harness | E5 |
+| FR-055 | Monitor | PostToolUse, side-effect only. Log emission and the like require harness-internal implementation; `script` as a rule | E6 |
 
-### 1.7a 既存 hook との共存
+### 1.7a Coexistence with Existing Hooks
 
-| ID | 要件 | 由来 US |
+| ID | Requirement | Source US |
 |---|---|---|
-| FR-070 | dispatcher は Claude Code の他 hook（ユーザが `settings.json` に登録済のもの）を参照・改変しない。独立したプロセスとして動作する | F1 |
-| FR-071 | `registry.json` の `entries` が空 / 該当 trigger のエントリが 0 件の場合、dispatcher は ALLOW を返して正常終了する（exit code 0） | F4 |
-| FR-072 | `priority` による実行順制御は dph 内ハーネスに閉じる。他 hook との順序は Claude Code の hook 仕様に従う。README / docs に明記する | F3 |
-| FR-073 | 既存 hook から dph registry への段階的移行ガイドを docs として提供する（二重実行回避のため、移行済ロジックは `settings.json` から削除する手順を含む） | F2 |
+| FR-070 | The dispatcher neither references nor modifies other Claude Code hooks (those the user has already registered in `settings.json`). It operates as an independent process | F1 |
+| FR-071 | When `entries` in `registry.json` is empty or there are zero matching entries for the trigger, the dispatcher returns ALLOW and exits normally (exit code 0) | F4 |
+| FR-072 | Execution-order control via `priority` is scoped to dph-internal harnesses. Ordering relative to other hooks follows the Claude Code hook specification. This is stated explicitly in the README / docs | F3 |
+| FR-073 | A migration guide for gradually moving existing hooks into the dph registry is provided as documentation (including steps to remove migrated logic from `settings.json` to avoid double execution) | F2 |
 
-### 1.7 state 管理方針
+### 1.7 State Management Policy
 
-state 管理機能（DS/DE/RS/RC 等）はフレームワークの責務外とする。
-Stateful Gate / Shield / Workflow 等 state 依存パターンが必要な場合、
-利用者は `script` 型ハーネス内で独自に永続化層（ファイル / SQLite 等）を
-実装する。framework は state 用の API / 拡張点を一切提供しない。
+State management features (DS/DE/RS/RC, etc.) are out of scope for the framework.
+When state-dependent patterns such as Stateful Gate / Shield / Workflow are required,
+users must implement their own persistence layer (file / SQLite / etc.) inside
+`script`-type harnesses. The framework provides no state-related API or extension point.
 
-v0.1 / v0.2+ を通じて方針は不変とする。
+This policy is invariant across v0.1 / v0.2+.
 
-## 2. 非機能要件（NFR）
+## 2. Non-Functional Requirements (NFR)
 
-### 2.1 性能
+### 2.1 Performance
 
-| ID | 要件 |
+| ID | Requirement |
 |---|---|
-| NFR-P-001 | dispatcher の処理時間（hook 受信 → 結果返却）は合致ハーネスがない場合 100ms 以内（subprocess 起動コスト除く）を目標とする |
-| NFR-P-002 | 宣言的ハーネス（`action`）は subprocess 起動なしで処理するため、script 型に比べ桁違いに高速であること |
+| NFR-P-001 | Dispatcher processing time (from hook reception to result return) shall target within 100ms when there are no matching harnesses (excluding subprocess startup cost) |
+| NFR-P-002 | Declarative harnesses (`action`) must be orders of magnitude faster than script-type since they are processed without subprocess startup |
 
-### 2.2 信頼性
+### 2.2 Reliability
 
-| ID | 要件 |
+| ID | Requirement |
 |---|---|
-| NFR-R-001 | 1 個のハーネスが異常終了 / timeout しても、同一イベントの他ハーネス処理は継続する |
-| NFR-R-002 | registry 読み込み失敗時は dispatcher を起動せず、Claude Code の hook をデフォルト（許可）で通過させる（fail-open）。fail-open の事実は stderr に記録する |
+| NFR-R-001 | Even if one harness terminates abnormally / times out, processing of other harnesses for the same event continues |
+| NFR-R-002 | On registry load failure, the dispatcher is not started and the Claude Code hook is passed through with the default (allow) (fail-open). The fact of fail-open is recorded to stderr |
 
-### 2.3 可搬性
+### 2.3 Portability
 
-| ID | 要件 |
+| ID | Requirement |
 |---|---|
-| NFR-PT-001 | Windows / Linux / macOS で動作する |
-| NFR-PT-002 | 実行には Python 3.9+ 標準ライブラリのみを使用する（外部依存ゼロ） |
-| NFR-PT-003 | ハーネスコードはベンダ非依存。同一スクリプトが将来の別 vendor adapter 下でも動作する（抽象化 I/O 契約遵守が条件） |
+| NFR-PT-001 | Runs on Windows / Linux / macOS |
+| NFR-PT-002 | Execution uses only the Python 3.9+ standard library (zero external dependencies) |
+| NFR-PT-003 | Harness code is vendor-independent. The same script works under a future, different vendor adapter (subject to compliance with the abstract I/O contract) |
 
-### 2.4 拡張性
+### 2.4 Extensibility
 
-| ID | 要件 |
+| ID | Requirement |
 |---|---|
-| NFR-E-001 | 新規ハーネス追加は、registry.json 編集 + scripts 配置のみで完結する（dispatcher / core コード変更不要） |
-| NFR-E-002 | 新規 vendor adapter 追加は、`adapters/<vendor>.py` ファイル新規作成のみで完結する |
-| NFR-E-003 | 宣言的ハーネス（`action`）により、script 不要の簡易ハーネスが registry 編集のみで追加できる |
+| NFR-E-001 | Adding a new harness is completed by editing `registry.json` and placing scripts only (no dispatcher / core code change required) |
+| NFR-E-002 | Adding a new vendor adapter is completed by creating a new `adapters/<vendor>.py` file only |
+| NFR-E-003 | Declarative harnesses (`action`) enable script-free simple harnesses to be added via registry edits alone |
 
-### 2.5 保守性
+### 2.5 Maintainability
 
-| ID | 要件 |
+| ID | Requirement |
 |---|---|
-| NFR-M-001 | 3 層構造（adapter / core / harness）が物理ディレクトリ上でも分離されている |
-| NFR-M-002 | core コードはベンダ固有シンボルを import しない |
+| NFR-M-001 | The 3-layer structure (adapter / core / harness) is physically separated at the directory level |
+| NFR-M-002 | Core code does not import vendor-specific symbols |
 
-### 2.6 セキュリティ
+### 2.6 Security
 
-| ID | 要件 |
+| ID | Requirement |
 |---|---|
-| NFR-S-001 | dispatcher は registry.json で宣言されたスクリプトのみを起動する（任意パス実行なし） |
-| NFR-S-002 | ハーネススクリプトのパスは `.claude/dynamic-prompt-harness/harnesses/` 配下に制限する（`../` トラバーサル禁止） |
+| NFR-S-001 | The dispatcher only launches scripts declared in `registry.json` (no arbitrary-path execution) |
+| NFR-S-002 | Harness script paths are restricted to under `.claude/dynamic-prompt-harness/harnesses/` (`../` traversal forbidden) |
 
-### 2.7 観測性
+### 2.7 Observability
 
-| ID | 要件 |
+| ID | Requirement |
 |---|---|
-| NFR-O-001 | dispatcher の実行ログ（タイムスタンプ / session_id / trigger / ハーネス名 / 結果 / エラー）は `.claude/dynamic-prompt-harness/logs/` に JSONL 形式で追記される |
-| NFR-O-002 | ログレベルは `debug` / `info` / `warn` / `error` の 4 段階をサポートする（FR-018） |
-| NFR-O-003 | ログローテーション / 保持期間は v0.1 では対象外（利用者責任） |
+| NFR-O-001 | Dispatcher execution logs (timestamp / session_id / trigger / harness name / result / error) are appended to `.claude/dynamic-prompt-harness/logs/` in JSONL format |
+| NFR-O-002 | Log level supports the 4 levels `debug` / `info` / `warn` / `error` (FR-018) |
+| NFR-O-003 | Log rotation / retention period is out of scope in v0.1 (user's responsibility) |
 
-## 3. インターフェース要件（IR）
+## 3. Interface Requirements (IR)
 
-| ID | インターフェース | 仕様参照先 |
+| ID | Interface | Spec Reference |
 |---|---|---|
-| IR-001 | Claude Code hook 入力 JSON | Claude Code 公式 hook spec |
-| IR-002 | Claude Code hook 出力 JSON | Claude Code 公式 hook spec |
-| IR-003 | 抽象化入力 JSON（dispatcher → harness） | FR-031 |
-| IR-004 | 抽象化出力 JSON（harness → dispatcher） | FR-032 |
-| IR-005 | registry.json スキーマ | FR-021 |
-| IR-006 | plugin manifest `.claude-plugin/plugin.json` | Claude Code plugin spec |
-| IR-007 | plugin hooks 登録 `hooks/hooks.json` | Claude Code plugin spec |
+| IR-001 | Claude Code hook input JSON | Claude Code official hook spec |
+| IR-002 | Claude Code hook output JSON | Claude Code official hook spec |
+| IR-003 | Abstract input JSON (dispatcher → harness) | FR-031 |
+| IR-004 | Abstract output JSON (harness → dispatcher) | FR-032 |
+| IR-005 | `registry.json` schema | FR-021 |
+| IR-006 | Plugin manifest `.claude-plugin/plugin.json` | Claude Code plugin spec |
+| IR-007 | Plugin hooks registration `hooks/hooks.json` | Claude Code plugin spec |
 
-## 4. 制約条件（CON）
+## 4. Constraints (CON)
 
-| ID | 制約 |
+| ID | Constraint |
 |---|---|
-| CON-001 | v0.1 では state 管理機能を含まない（v0.2+ の別パッケージ扱い） |
-| CON-002 | v0.1 では Claude Code adapter のみを提供する |
-| CON-003 | dispatcher / adapter / core は Python 実装とする |
-| CON-004 | 外部 Python 依存（requirements.txt 等）は導入しない |
-| CON-005 | 配布は Claude Code plugin marketplace 形式とする |
+| CON-001 | v0.1 does not include state management features (treated as a separate package in v0.2+) |
+| CON-002 | v0.1 provides only the Claude Code adapter |
+| CON-003 | Dispatcher / adapter / core are implemented in Python |
+| CON-004 | External Python dependencies (`requirements.txt`, etc.) shall not be introduced |
+| CON-005 | Distribution follows the Claude Code plugin marketplace format |
 
-## 5. トレーサビリティ
+## 5. Traceability
 
-US → 要件の対応を以下に示す（逆方向トレースは各 FR 表の「由来 US」欄）。
+The US-to-requirement mapping is shown below (the reverse trace is in the "Source US" column of each FR table).
 
-| US | 対応 FR |
+| US | Corresponding FR |
 |---|---|
 | US-A1 | FR-001 |
 | US-A2 | FR-002 |
@@ -192,9 +192,9 @@ US → 要件の対応を以下に示す（逆方向トレースは各 FR 表の
 | US-E4 | FR-053 |
 | US-E5 | FR-054 |
 | US-E6 | FR-055 |
-| US-E7 | （framework 対象外 — 1.7 節、ハーネス内独自実装） |
-| US-E8 | （framework 対象外 — 1.7 節、ハーネス内独自実装） |
-| US-E9 | （framework 対象外 — 1.7 節、ハーネス内独自実装） |
+| US-E7 | (out of framework scope — section 1.7, implement inside harness) |
+| US-E8 | (out of framework scope — section 1.7, implement inside harness) |
+| US-E9 | (out of framework scope — section 1.7, implement inside harness) |
 | US-F1 | FR-070 |
 | US-F2 | FR-073 |
 | US-F3 | FR-072 |

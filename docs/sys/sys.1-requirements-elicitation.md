@@ -1,191 +1,208 @@
 # User Stories: dynamic-prompt-harness
 
-Claude Code hook を利用した動的プロンプト注入 / ハーネスエンジニアリングの
-汎用ランタイム。具象ハーネスを ad-hoc に追加できる仕組みを本体価値とし、
-テンプレート提供は副次的とする。
+A general-purpose runtime for dynamic prompt injection / harness engineering
+via Claude Code hooks. The core value is a mechanism to add concrete harnesses
+ad-hoc; providing templates is a secondary concern.
 
-## 前提（決定事項）
+## Prerequisites (Decisions)
 
-| 項目 | 決定 |
+| Item | Decision |
 |---|---|
-| リポ / plugin 名 | `dynamic-prompt-harness` |
-| 追加単位 | 宣言的ハーネス（registry のみ）または 1 ハーネス = 1 スクリプト |
-| Dispatcher | 単一 hook が全トリガ受ける |
-| Registry | `registry.json` 中央集権 |
-| I/O 契約 | 抽象化層あり（ベンダ非依存） |
-| 合成 | 優先度＋短絡、同一 priority は登録順 |
-| State | framework 対象外（必要時はハーネス内で独自実装） |
-| 言語 | Python（dispatcher/adapter） |
-| Matcher | 2 段階（registry 粗 + ハーネス細） |
-| 配置（plugin） | `.claude/plugins/dynamic-prompt-harness/` |
-| 配置（ユーザデータ） | `.claude/dynamic-prompt-harness/` |
-| 配布 | Claude plugin + marketplace |
-| v0.1 スコープ | dispatcher + registry + adapter のみ |
+| Repo / plugin name | `dynamic-prompt-harness` |
+| Unit of addition | Declarative harness (registry only) or 1 harness = 1 script |
+| Dispatcher | A single hook receives all triggers |
+| Registry | Centralized `registry.json` |
+| I/O contract | Abstraction layer present (vendor-agnostic) |
+| Composition | Priority + short-circuit; same priority follows registration order |
+| State | Out of framework scope (implement per-harness if needed) |
+| Language | Python (dispatcher/adapter) |
+| Matcher | Two stages (coarse in registry + fine in harness) |
+| Location (plugin) | `.claude/plugins/dynamic-prompt-harness/` |
+| Location (user data) | `.claude/dynamic-prompt-harness/` |
+| Distribution | Claude plugin + marketplace |
+| v0.1 scope | dispatcher + registry + adapter only |
 
-## ステークホルダ
+## Stakeholders
 
-- **プロジェクト運用者**: ランタイムを導入し registry を管理
-- **ハーネス作成者**: 具象ハーネスを追加する
-- **LLM エージェント**: 制御対象（hook で制約を受ける）
-- **フレームワーク開発者**: dynamic-prompt-harness 本体を保守
+- **Project operator**: deploys the runtime and manages the registry
+- **Harness author**: adds concrete harnesses
+- **LLM agent**: the control target (constrained by hooks)
+- **Framework developer**: maintains dynamic-prompt-harness itself
 
-## A. 導入・初期化
+## A. Installation and Initialization
 
 ### US-A1
-プロジェクト運用者として、`/plugin install dynamic-prompt-harness@<marketplace>`
-でランタイムを導入でき、手動のファイル配置が不要。
+As a project operator, I can install the runtime via
+`/plugin install dynamic-prompt-harness@<marketplace>` without placing files
+manually.
 
 ### US-A2
-プロジェクト運用者として、slash command（例: `/dph-init`）で
-`.claude/dynamic-prompt-harness/` 骨子（registry.json + harnesses/）を
-自プロジェクトに生成できる。
+As a project operator, I can generate the
+`.claude/dynamic-prompt-harness/` skeleton (registry.json + harnesses/)
+in my project via a slash command (e.g., `/dph-init`).
 
 ### US-A3
-プロジェクト運用者として、インストール時に dispatcher hook が自動で
-settings.json 相当に登録される（plugin の hooks.json 機構に依存）。
+As a project operator, the dispatcher hook is automatically registered into
+the equivalent of settings.json at install time (relying on the plugin's
+hooks.json mechanism).
 
-## B. ハーネス追加・更新
+## B. Adding and Updating Harnesses
 
 ### US-B1
-作成者として、スクリプトを `.claude/dynamic-prompt-harness/harnesses/` に
-置き `registry.json` にエントリを追加するだけでハーネスが有効化される
-（dispatcher コード改変不要）。
+As an author, a harness becomes active simply by placing a script under
+`.claude/dynamic-prompt-harness/harnesses/` and adding an entry to
+`registry.json` (no dispatcher code changes required).
 
 ### US-B2
-作成者として、registry の `enabled` フラグで個別ハーネスを無効化できる
-（スクリプトは残したまま）。
+As an author, I can disable an individual harness via the `enabled` flag in
+the registry (leaving the script in place).
 
 ### US-B3
-作成者として、`priority` 整数で実行順を制御できる。
-同一 priority の場合は `registry.json` での登録順で実行される。
+As an author, I can control execution order via the `priority` integer.
+Entries with the same priority execute in registration order within
+`registry.json`.
 
 ### US-B4
-作成者として、`registry.json` が schema 検証され、不正時は明確な
-エラーメッセージが出る（無音で無視しない）。
+As an author, `registry.json` is schema-validated, and invalid entries
+produce a clear error message (never silently ignored).
 
 ### US-B5
-作成者として、stdin/stdout 契約に従えば任意言語（bash / python / node 等）で
-ハーネスを書ける。
+As an author, I can write a harness in any language (bash / python / node,
+etc.) as long as the stdin/stdout contract is followed.
 
 ### US-B6
-作成者として、pattern hit → `deny` / `allow` / `hint` + 固定 message で済む
-簡易ケースは、スクリプトを書かずに registry.json の宣言だけでハーネスを
-追加できる（宣言的ハーネス）。
+As an author, for simple cases where a pattern hit maps directly to
+`deny` / `allow` / `hint` with a fixed message, I can add a harness purely
+by declaration in registry.json without writing a script
+(declarative harness).
 
-## C. 実行時挙動
+## C. Runtime Behavior
 
 ### US-C1
-フレームワークは PreToolUse / PostToolUse / UserPromptSubmit / PreCompact を
-単一 dispatcher で受ける。
+The framework receives PreToolUse / PostToolUse / UserPromptSubmit /
+PreCompact through a single dispatcher.
 
 ### US-C2
-dispatcher は `trigger + tool + pattern` で subprocess 生成前に粗く絞り込む。
+The dispatcher performs coarse filtering by `trigger + tool + pattern`
+before spawning subprocesses.
 
 ### US-C3
-合致ハーネスを priority 順で実行する。同一 priority の場合は
-`registry.json` の登録順。最初の DENY で短絡する。
+Matching harnesses are executed in priority order; same-priority entries
+follow registration order in `registry.json`. Execution short-circuits on
+the first DENY.
 
 ### US-C4
-HINT は全件連結して 1 つの出力にする。
+HINT outputs are concatenated from all harnesses into a single output.
 
 ### US-C5
-個別ハーネスの timeout / crash は dispatcher が捕捉し、ログ出力 +
-該当ハーネスのスキップ + 後続続行。
+Timeouts or crashes in individual harnesses are caught by the dispatcher,
+logged, the offending harness is skipped, and subsequent execution continues.
 
 ### US-C6
-抽象化 I/O → ベンダ hook JSON の変換は adapter 層のみの責務。
-core / ハーネスにベンダ固有コードは出現しない。
+Translation between abstract I/O and vendor-specific hook JSON is the sole
+responsibility of the adapter layer. Vendor-specific code does not appear in
+core or in harnesses.
 
-## D. ベンダ抽象
+## D. Vendor Abstraction
 
 ### US-D1
-開発者として、Claude Code 固有ロジックは `adapters/claude_code.py` だけに
-閉じ込められており、Cursor / Gemini 等の adapter 追加は新規ファイル作成で済む。
+As a developer, Claude Code-specific logic is confined to
+`adapters/claude_code.py`, so adding an adapter for Cursor / Gemini / etc.
+requires only a new file.
 
 ### US-D2
-作成者として、ハーネスコードは vendor 非依存。同じスクリプトが別 vendor でも
-動く（adapter が存在する前提）。
+As an author, harness code is vendor-independent. The same script runs on
+another vendor provided an adapter exists.
 
 ### US-D3
-ベンダ固有機能（Claude Code の `hookSpecificOutput` 等）は adapter メタデータ
-経由で表現可能。ハーネスコードにベンダ固有フィールドは漏れない。
+Vendor-specific features (e.g., Claude Code's `hookSpecificOutput`) are
+expressible via adapter metadata. Vendor-specific fields do not leak into
+harness code.
 
-## E. 具象ハーネス動作（パターン表現可能性の保証）
+## E. Concrete Harness Behaviors (Guaranteeing Pattern Expressibility)
 
-v0.1 で state 不要のパターン 6 件を US 化。
-state 依存パターン 3 件は [v0.2+] として拡張点のみ担保。
+Six stateless patterns are elaborated as user stories in v0.1.
+Three state-dependent patterns are deferred to [v0.2+]; only the extension
+points are guaranteed.
 
 ### US-E1 — Gate
-LLM が deny パターンに合う操作を試みると、推奨代替メッセージと共に
-ブロックされる（例: `.env` ファイルの `git add`）。
+When the LLM attempts an operation matching a deny pattern, it is blocked
+together with a recommended alternative message
+(e.g., `git add` of a `.env` file).
 
 ### US-E2 — Guide
-LLM がステップを完了すると、次ステップ HINT を受け取る
-（例: commit 完了 → push 推奨）。
+When the LLM completes a step, it receives a HINT for the next step
+(e.g., after commit completion, push is recommended).
 
 ### US-E3 — Validator
-LLM の出力がチェックに失敗すると、修正 HINT を受け取る
-（例: 新規関数追加時に test ファイル欠如 → test 追加提案）。
+When the LLM's output fails a check, it receives a corrective HINT
+(e.g., when a new function is added but the test file is missing,
+a proposal to add a test).
 
 ### US-E4 — Guard
-前提条件未充足時、充足手順付きでブロックされる
-（例: `/compact` 実行時に日記未記入 → 日記 write 手順提示）。
+When preconditions are unmet, the operation is blocked together with the
+procedure to satisfy them (e.g., when `/compact` runs without a diary
+entry, the diary-write procedure is presented).
 
 ### US-E5 — Circuit Breaker
-同一エラーが N 回以上発生すると、後続同種操作をブロックし
-人間エスカレートを HINT する。
+When the same error occurs N or more times, subsequent operations of the
+same kind are blocked and a HINT escalating to a human is provided.
 
 ### US-E6 — Monitor
-PostToolUse で観測のみ（常に ALLOW、ログ出力）。
-状態変更なしでメトリクス取得が可能。
+Observation-only at PostToolUse (always ALLOW, log output). Metrics can
+be collected without mutating state.
 
-### US-E7 — Stateful Gate（framework 対象外）
-DS/DE 状態付き判定が必要な場合、ハーネス作成者は `script` 型ハーネス内で
-独自の永続化層（ファイル / SQLite 等）を実装する。framework は state 管理
-API を提供しない。
+### US-E7 — Stateful Gate (out of framework scope)
+If DS/DE stateful decisions are required, the harness author implements a
+dedicated persistence layer (file / SQLite / etc.) inside a `script`-type
+harness. The framework provides no state-management API.
 
-### US-E8 — Shield（framework 対象外）
-使用中リソース保護が必要な場合も、同様にハーネス内独自実装。
+### US-E8 — Shield (out of framework scope)
+Protecting in-use resources is likewise implemented inside the harness.
 
-### US-E9 — Workflow（framework 対象外）
-多段ステップ遷移も、同様にハーネス内独自実装。
+### US-E9 — Workflow (out of framework scope)
+Multi-step state transitions are likewise implemented inside the harness.
 
-## F. 既存 hook との共存
+## F. Coexistence with Existing Hooks
 
 ### US-F1
-プロジェクト運用者として、既に `settings.json` に登録済みの独自 hook を残した
-まま dynamic-prompt-harness を導入でき、既存 hook が壊れない。dph は独立した
-hook プロセスとして動作し、他 hook を参照・改変しない。
+As a project operator, I can install dynamic-prompt-harness while keeping
+custom hooks already registered in `settings.json`, without breaking them.
+dph runs as an independent hook process and does not reference or modify
+other hooks.
 
 ### US-F2
-プロジェクト運用者として、既存 hook のロジックを段階的に registry に移行でき、
-移行完了したものは `settings.json` 側から削除する運用で二重実行を回避できる
-（移行ガイドがある）。
+As a project operator, I can migrate existing hook logic into the registry
+incrementally; migrated items are removed from `settings.json` to avoid
+double execution (a migration guide is provided).
 
 ### US-F3
-プロジェクト運用者として、dph の `priority` は dph 内ハーネスの順序のみを制御し、
-他 hook との実行順は Claude Code の hook 仕様に従う、と明示的に理解できる。
+As a project operator, I explicitly understand that dph's `priority`
+controls only the order among dph's internal harnesses, while the ordering
+between dph and other hooks follows Claude Code's hook specification.
 
 ### US-F4
-プロジェクト運用者として、`registry.json` のエントリが 0 件の状態でも dispatcher は
-ALLOW を返して正常終了する（導入直後の空状態で既存機能を壊さない）。
+As a project operator, the dispatcher returns ALLOW and exits normally
+even when `registry.json` has zero entries (the empty state immediately
+after install does not break existing functionality).
 
-## 網羅性チェック
+## Coverage Check
 
-### ステークホルダ網羅
-| ステークホルダ | 該当 US |
+### Stakeholder Coverage
+| Stakeholder | Applicable US |
 |---|---|
-| プロジェクト運用者 | A1, A2, A3, F1, F2, F3, F4 |
-| ハーネス作成者 | B1, B2, B3, B4, B5, B6, D2 |
-| LLM エージェント | E1〜E9 |
-| フレームワーク開発者 | C1〜C6, D1, D3 |
+| Project operator | A1, A2, A3, F1, F2, F3, F4 |
+| Harness author | B1, B2, B3, B4, B5, B6, D2 |
+| LLM agent | E1-E9 |
+| Framework developer | C1-C6, D1, D3 |
 
-### カテゴリ別件数
-- (A) 導入・初期化: 3
-- (B) ハーネス追加・更新: 6
-- (C) 実行時挙動: 6
-- (D) ベンダ抽象: 3
-- (E) 具象ハーネス動作: 9（うち framework スコープ 6、対象外 3）
-- (F) 既存 hook との共存: 4
+### Counts per Category
+- (A) Installation and Initialization: 3
+- (B) Adding and Updating Harnesses: 6
+- (C) Runtime Behavior: 6
+- (D) Vendor Abstraction: 3
+- (E) Concrete Harness Behaviors: 9 (6 in framework scope, 3 out of scope)
+- (F) Coexistence with Existing Hooks: 4
 
-**framework スコープ US 合計: 28 件**（対象外 3 件は利用者責任として明記）
+**Total user stories in framework scope: 28** (the 3 out-of-scope items
+are documented as user responsibility)

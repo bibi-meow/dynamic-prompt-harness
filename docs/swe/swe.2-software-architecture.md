@@ -1,18 +1,18 @@
 # SWE.2 Software Architectural Design — dynamic-prompt-harness
 
-**Scope**: クラス構造・責務境界・依存方向・インターフェース概要の合意。
-内部実装（アルゴリズム・private メソッド・エラー分岐の詳細）は SWE.3 / 実装時に確定する。
+**Scope**: Agreement on class structure, responsibility boundaries, dependency direction, and interface overview.
+Internal implementation (algorithms, private methods, detailed error branching) is finalized in SWE.3 / during implementation.
 
-**決定事項（brainstorming で合意済み）**：
-- Executor は **subprocess 方式**（任意コマンド実行、bash/node/python 混在可）
-- Registry entry は **固定スキーマ + `frozen dataclass` + JSON Schema 二重防御**
-- 例外処理は **コア定義の `DPHError` 階層**、dispatcher トップで catch
-- Adapter は **vendor ごとに 1 ペア**（`parse_input` / `format_output`）
-- Registry は **invocation ごと読込、trigger 種別だけフィルタ**
+**Decisions (agreed in brainstorming)**:
+- Executor uses **subprocess style** (arbitrary command execution; bash/node/python can coexist)
+- Registry entries use a **fixed schema + `frozen dataclass` + JSON Schema double defense**
+- Exception handling uses a **core-defined `DPHError` hierarchy**, caught at the top of the dispatcher
+- Adapters are **one pair per vendor** (`parse_input` / `format_output`)
+- Registry is **loaded per invocation, filtered only by trigger type**
 
 ---
 
-## 1. モジュール構成とクラス一覧
+## 1. Module layout and class inventory
 
 ```mermaid
 graph TB
@@ -30,7 +30,7 @@ graph TB
         COM["Composer"]
         SCH["SchemaValidator"]
         LOG["JsonlLogger"]
-        ERR["errors<br/>DPHError 階層"]
+        ERR["errors<br/>DPHError hierarchy"]
     end
 
     MAIN --> DSP
@@ -49,21 +49,21 @@ graph TB
     CC --> ERR
 ```
 
-| モジュール | クラス / 型 | 役割 |
+| Module | Class / Type | Role |
 |---|---|---|
-| `core.io_contract` | `AbstractInput`, `AbstractResult`, `Entry`, `Decision` (Enum) | 全層共有の frozen dataclass / Enum |
-| `core.registry` | `Registry` | `registry.json` ロード・trigger filter・priority sort |
-| `core.executor` | `Executor` | `Entry` を subprocess 実行、stdout/exit を `AbstractResult` に変換 |
-| `core.composer` | `Composer` | 複数 `AbstractResult` を AND-composition で畳む |
-| `core.schema` | `SchemaValidator` | registry.json を stdlib のみで検証 |
-| `core.logger` | `JsonlLogger` | JSONL 追記、log_level 精度管理 |
-| `core.errors` | `DPHError`, `RegistryError`, `ExecutionError`, `SchemaError`, `AdapterError` | 例外階層 |
-| `adapters.claude_code` | `ClaudeCodeAdapter` | Claude Code hook JSON ↔ `Abstract*` 変換 |
-| `dispatcher` | `Dispatcher` | 全体フロー制御、トップレベル例外ハンドラ |
+| `core.io_contract` | `AbstractInput`, `AbstractResult`, `Entry`, `Decision` (Enum) | Frozen dataclass / Enum shared across all layers |
+| `core.registry` | `Registry` | Loads `registry.json`, applies trigger filter, priority sort |
+| `core.executor` | `Executor` | Runs `Entry` as subprocess; converts stdout/exit into `AbstractResult` |
+| `core.composer` | `Composer` | Folds multiple `AbstractResult` via AND-composition |
+| `core.schema` | `SchemaValidator` | Validates registry.json using stdlib only |
+| `core.logger` | `JsonlLogger` | Appends JSONL; manages log_level granularity |
+| `core.errors` | `DPHError`, `RegistryError`, `ExecutionError`, `SchemaError`, `AdapterError` | Exception hierarchy |
+| `adapters.claude_code` | `ClaudeCodeAdapter` | Converts between Claude Code hook JSON and `Abstract*` |
+| `dispatcher` | `Dispatcher` | Overall flow control; top-level exception handler |
 
 ---
 
-## 2. データ構造（core.io_contract）
+## 2. Data structures (core.io_contract)
 
 ```mermaid
 classDiagram
@@ -104,15 +104,15 @@ classDiagram
     AbstractResult --> Decision
 ```
 
-**不変条件**:
-- `Entry.triggers` は `pre_tool_use` / `post_tool_use` / `user_prompt_submit` / `pre_compact` のいずれかの tuple（重複不可）
-- `Entry.command` は tuple（list ではない）— frozen 保証
-- `AbstractInput.trigger` は Entry.triggers と同値域
-- `AbstractResult.decision == DENY` のとき `message` は必須（composer が統合メッセージを作るため）
+**Invariants**:
+- `Entry.triggers` is a tuple of values drawn from `pre_tool_use` / `post_tool_use` / `user_prompt_submit` / `pre_compact` (no duplicates)
+- `Entry.command` is a tuple (not a list) — guaranteed by frozen
+- `AbstractInput.trigger` has the same value domain as Entry.triggers
+- When `AbstractResult.decision == DENY`, `message` is required (so the composer can build a merged message)
 
 ---
 
-## 3. クラス関係図（主要インターフェース）
+## 3. Class relationship diagram (key interfaces)
 
 ```mermaid
 classDiagram
@@ -168,7 +168,7 @@ classDiagram
 
 ---
 
-## 4. 実行シーケンス
+## 4. Execution sequence
 
 ```mermaid
 sequenceDiagram
@@ -193,7 +193,7 @@ sequenceDiagram
         D->>E: execute(entry, input)
         E-->>D: AbstractResult
         D->>L: log(execution)
-        Note over D: DENY なら break
+        Note over D: break on DENY
     end
     D->>CO: compose(results)
     CO-->>D: merged AbstractResult
@@ -203,29 +203,29 @@ sequenceDiagram
     M-->>CC: stdout + exit
 ```
 
-**短絡条件**: いずれかの Entry が `DENY` を返した時点で以降の Entry を実行しない（FR-033）。
-**空レジストリ**: `entries_for` が空 list を返した場合、Composer は `AbstractResult(ALLOW, None, {})` を返す（FR-071）。
+**Short-circuit condition**: as soon as any Entry returns `DENY`, subsequent Entries are not executed (FR-033).
+**Empty registry**: when `entries_for` returns an empty list, Composer returns `AbstractResult(ALLOW, None, {})` (FR-071).
 
 ---
 
-## 5. 依存方向（Dependency Rules）
+## 5. Dependency direction (Dependency Rules)
 
 ```mermaid
 graph LR
     A[adapters.*] --> C[core.*]
     D[dispatcher] --> A
     D --> C
-    C -.禁止.-> A
-    C -.禁止.-> D
+    C -.forbidden.-> A
+    C -.forbidden.-> D
 ```
 
-- **AP-2 再掲**: core は adapters を import してはならない。vendor 追加時に core 改変不要を保証
-- dispatcher は両方を知ってよいトップレベル接着層
-- `core.*` 内の相互依存は `io_contract` / `errors` → その他の一方向のみ（`io_contract` は葉、他モジュールが import する）
+- **AP-2 restated**: core must not import adapters. This guarantees that adding a new vendor requires no changes to core.
+- dispatcher is the top-level glue layer that may know about both.
+- Within `core.*`, mutual dependencies flow only one way: `io_contract` / `errors` → everything else (`io_contract` is a leaf imported by other modules).
 
 ---
 
-## 6. 例外階層と責務
+## 6. Exception hierarchy and responsibilities
 
 ```mermaid
 classDiagram
@@ -240,19 +240,19 @@ classDiagram
     DPHError <|-- AdapterError
 ```
 
-| 例外 | 発生源 | dispatcher の扱い |
+| Exception | Origin | Dispatcher handling |
 |---|---|---|
-| `SchemaError` | `SchemaValidator.validate` | log(error) → ALLOW で抜ける（install 壊さない、FR-071 系） |
-| `RegistryError` | `Registry.load` (IO/JSON parse) | 同上 |
-| `ExecutionError` | `Executor.execute` (subprocess timeout/非0) | log(error) → この entry をスキップして次へ |
-| `AdapterError` | `parse_input` / `format_output` | log(error) → exit 0 / stdout 空（hook 動作に干渉しない） |
-| 未知の例外 | 任意 | log(critical) → exit 0 fail-safe |
+| `SchemaError` | `SchemaValidator.validate` | log(error) → exit with ALLOW (do not break installation; FR-071 family) |
+| `RegistryError` | `Registry.load` (IO / JSON parse) | Same as above |
+| `ExecutionError` | `Executor.execute` (subprocess timeout / non-zero exit) | log(error) → skip this entry and continue |
+| `AdapterError` | `parse_input` / `format_output` | log(error) → exit 0 / empty stdout (do not interfere with hook behavior) |
+| Unknown exception | Anywhere | log(critical) → exit 0 fail-safe |
 
-**fail-safe 原則**: dispatcher 自体のバグは Claude Code の動作を止めない。DENY は registry の意図によってのみ発生する。
+**Fail-safe principle**: bugs in the dispatcher itself must never stop Claude Code. DENY occurs only by explicit registry intent.
 
 ---
 
-## 7. インターフェース要約（シグネチャのみ）
+## 7. Interface summary (signatures only)
 
 ```python
 # adapters/claude_code.py
@@ -289,38 +289,38 @@ class Dispatcher:
     def run(self, trigger: str, raw_stdin: str) -> int: ...
 ```
 
-内部 private メソッド / アルゴリズム / 分岐詳細は SWE.3 / 実装時に確定（本書のスコープ外）。
+Internal private methods / algorithms / branching details are finalized in SWE.3 / during implementation (out of scope for this document).
 
 ---
 
-## 8. テスト可能性（SWE.2 観点）
+## 8. Testability (SWE.2 perspective)
 
-- **単体性**: 各クラスは `__init__` で依存を注入、副作用（ファイル IO・subprocess）は `Executor` / `JsonlLogger` / `Registry.load` に局所化
-- **Mock 境界**: `Executor.execute` と `JsonlLogger.log` を差し替えれば dispatcher はインメモリで完結
-- **Contract test**: `ClaudeCodeAdapter` は実 hook JSON サンプル（`.claude/settings.json` / 公式ドキュメント）に対して往復テスト可能
-- **Schema test**: `SchemaValidator` は正例 / 負例 fixture で網羅
+- **Unit isolation**: each class injects its dependencies via `__init__`; side effects (file IO, subprocess) are localized to `Executor` / `JsonlLogger` / `Registry.load`
+- **Mock boundary**: swapping `Executor.execute` and `JsonlLogger.log` lets the dispatcher run end-to-end in memory
+- **Contract test**: `ClaudeCodeAdapter` can be round-trip tested against real hook JSON samples (`.claude/settings.json` / official documentation)
+- **Schema test**: `SchemaValidator` is covered by positive / negative fixtures
 
 ---
 
-## 9. トレーサビリティ（SYS.3 → SWE.2）
+## 9. Traceability (SYS.3 → SWE.2)
 
-| SYS.3 要素 | SWE.2 クラス |
+| SYS.3 element | SWE.2 class |
 |---|---|
 | §4 adapters/claude_code | `ClaudeCodeAdapter` |
 | §4 core.registry | `Registry` + `SchemaValidator` |
 | §4 core.executor | `Executor` |
 | §4 core.composer | `Composer` |
-| §4 core.io_contract | `io_contract` dataclass 群 |
+| §4 core.io_contract | `io_contract` dataclasses |
 | §4 core.logger | `JsonlLogger` |
 | §4 dispatcher | `Dispatcher` |
-| §6 AP-2（core→adapters 禁止） | §5 依存方向 |
-| §7 処理シーケンス 8 ステップ | §4 実行シーケンス |
-| §8 empty registry ALLOW | §4 注記 + §6 fail-safe |
+| §6 AP-2 (core→adapters forbidden) | §5 Dependency direction |
+| §7 8-step processing sequence | §4 Execution sequence |
+| §8 empty registry ALLOW | §4 note + §6 fail-safe |
 
 ---
 
-## 10. 次ステップ
+## 10. Next steps
 
-- [ ] 本書レビュー
-- [ ] SWE.3 Detailed Design（内部アルゴリズム・private メソッド）— 実装と同時進行可
-- [ ] TDD: `io_contract` → `SchemaValidator` → `Registry` → `Composer` → `Executor` → `ClaudeCodeAdapter` → `Dispatcher` の順で red→green
+- [ ] Review this document
+- [ ] SWE.3 Detailed Design (internal algorithms, private methods) — can proceed in parallel with implementation
+- [ ] TDD: work red→green in the order `io_contract` → `SchemaValidator` → `Registry` → `Composer` → `Executor` → `ClaudeCodeAdapter` → `Dispatcher`
