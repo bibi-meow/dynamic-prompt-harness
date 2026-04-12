@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "echo-pretool",
+      "triggers": ["pre_tool_use"],
+      "matcher": "Write|Edit",
+      "command": ["python", "-c", "import json,sys; json.dump({'decision':'allow'}, sys.stdout)"],
+      "priority": 0,
+      "timeout_sec": 5
+    }
+  ]
+}

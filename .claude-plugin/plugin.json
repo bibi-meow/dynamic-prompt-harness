@@ -1,0 +1,6 @@
+{
+  "name": "dynamic-prompt-harness",
+  "version": "0.1.0",
+  "description": "Registry-based hook dispatcher",
+  "hooks": "./hooks/hooks.json"
+}

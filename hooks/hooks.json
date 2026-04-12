@@ -1,0 +1,8 @@
+{
+  "hooks": {
+    "PreToolUse": [{"matcher": ".*", "hooks": [{"type": "command", "command": "python -m dynamic_prompt_harness pre_tool_use"}]}],
+    "PostToolUse": [{"matcher": ".*", "hooks": [{"type": "command", "command": "python -m dynamic_prompt_harness post_tool_use"}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python -m dynamic_prompt_harness user_prompt_submit"}]}],
+    "PreCompact": [{"hooks": [{"type": "command", "command": "python -m dynamic_prompt_harness pre_compact"}]}]
+  }
+}
