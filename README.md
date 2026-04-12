@@ -12,16 +12,33 @@ Modern coding agents are powerful but non-deterministic. A thin **deterministic 
 
 ## Quickstart
 
+Install as a Claude Code plugin via the community marketplace:
+
+```
+/plugin marketplace add bibi-meow/dynamic-prompt-harness
+/plugin install dynamic-prompt-harness@dynamic-prompt-harness
+/reload-plugins
+```
+
+Then create an empty registry in your project root so dph has something to load:
+
 ```bash
-pip install -e .
 mkdir -p .claude/dynamic-prompt-harness
 cat > .claude/dynamic-prompt-harness/registry.json <<'JSON'
 {"version": 1, "entries": []}
 JSON
-python -m pytest tests/ -v
 ```
 
-Then wire the plugin via `hooks/hooks.json` (Claude Code plugin manifest) or copy the hook entries into your `.claude/settings.json`. Walkthrough: [docs/tutorial/01-first-harness.md](docs/tutorial/01-first-harness.md).
+Add entries to `registry.json` to activate rules. Walkthrough: [docs/tutorial/01-first-harness.md](docs/tutorial/01-first-harness.md).
+
+### Developer install (from source)
+
+```bash
+git clone https://github.com/bibi-meow/dynamic-prompt-harness.git
+cd dynamic-prompt-harness
+pip install -e .
+python -m pytest tests/ -v
+```
 
 ## Documentation (Diátaxis)
 
