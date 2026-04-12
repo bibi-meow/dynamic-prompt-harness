@@ -1,6 +1,13 @@
 {
   "name": "dynamic-prompt-harness",
   "version": "0.1.0",
-  "description": "Registry-based hook dispatcher",
+  "description": "A registry-driven hook dispatcher for Claude Code — composable deterministic harness via JSON-declared subprocess rules.",
+  "author": {
+    "name": "bibi-meow"
+  },
+  "homepage": "https://github.com/bibi-meow/dynamic-prompt-harness",
+  "repository": "https://github.com/bibi-meow/dynamic-prompt-harness",
+  "license": "MIT",
+  "keywords": ["claude-code", "hooks", "harness", "governance", "dispatcher", "registry"],
   "hooks": "./hooks/hooks.json"
 }
