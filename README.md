@@ -83,6 +83,27 @@ Full reference: [docs/reference/subprocess-contract.md](docs/reference/subproces
 
 More: [docs/how-to/troubleshoot.md](docs/how-to/troubleshoot.md).
 
+### Known issue: VSCode native extension does not fire plugin hooks
+
+Upstream bug [anthropics/claude-code#18547](https://github.com/anthropics/claude-code/issues/18547): the VSCode Claude Code extension registers plugin hooks on `/reload-plugins` but does not dispatch them on actual tool invocations. Confirmed on v2.1.92.
+
+**Not affected**: Claude Code CLI (`claude` / `claude -p`). dph fires normally there.
+
+**Workaround for VSCode users** — copy the hook commands from `hooks/hooks.json` into `~/.claude/settings.json` (or project `.claude/settings.json`) manually:
+
+```json
+{
+  "hooks": {
+    "PreToolUse":  [{"matcher": ".*", "hooks": [{"type": "command", "command": "python -m dynamic_prompt_harness pre_tool_use"}]}],
+    "PostToolUse": [{"matcher": ".*", "hooks": [{"type": "command", "command": "python -m dynamic_prompt_harness post_tool_use"}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python -m dynamic_prompt_harness user_prompt_submit"}]}],
+    "PreCompact": [{"hooks": [{"type": "command", "command": "python -m dynamic_prompt_harness pre_compact"}]}]
+  }
+}
+```
+
+This loses plugin portability (hooks no longer update with the plugin) but restores firing until the upstream bug is fixed.
+
 ## Tests
 
 ```bash
