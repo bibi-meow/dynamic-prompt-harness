@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-04-13
+
+### Changed
+- Dispatcher now evaluates **all** matching entries per trigger (no short-circuit on first DENY). Governance semantics require full evidence, not fast veto. **Behavior shift for entry authors:** entries with non-idempotent side effects (file writes, network calls, counters) now run even after an upstream entry returns DENY. Audit existing entries for side-effect safety.
+- Composer preserves per-entry metadata as `metadata["per_entry"][entry_id]` and joins deny/hint messages with `"; "`.
+- Logger canonicalizes `warning` (alongside legacy `warn` alias).
+- Registry pre-compiles `matcher` regex at load time.
+
+### Added
+- Single `dph_decision` JSONL record per dispatcher invocation: `trigger`, `matched_entries`, `per_entry_outcomes`, `final_decision`, `final_message`, `latency_ms`.
+- Schema invariants with error codes: `E_DUPLICATE_ID`, `E_BAD_TIMEOUT`, `E_BAD_LOG_LEVEL`, `E_BAD_COMMAND`, `E_BAD_MATCHER`.
+
+### Fixed
+- `registry-schema.md` used `warn`; normalized to `warning` to match `cli.md` and runtime canonical level.
+- `pyproject.toml` was stuck at `0.1.0` despite `plugin.json` being at `0.1.1`; all three metadata sources now agree.
+
 ## [0.1.1] - 2026-04-13
 
 ### Fixed

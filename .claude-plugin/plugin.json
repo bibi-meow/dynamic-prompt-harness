@@ -1,6 +1,6 @@
 {
   "name": "dynamic-prompt-harness",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A registry-driven hook dispatcher for Claude Code — composable deterministic harness via JSON-declared subprocess rules.",
   "author": {
     "name": "bibi-meow"
