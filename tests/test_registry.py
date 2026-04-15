@@ -35,3 +35,26 @@ def test_matcher_filter(tmp_path):
     r = Registry.load(p)
     assert [e.id for e in r.entries_for("pre_tool_use", "Write")] == ["a", "b"]
     assert [e.id for e in r.entries_for("pre_tool_use", "Bash")] == ["b"]
+
+def test_registry_matches_with_precompiled_regex(tmp_path):
+    import json
+    from dynamic_prompt_harness.core.registry import Registry
+
+    reg = tmp_path / "r.json"
+    reg.write_text(json.dumps({
+        "version": 1,
+        "entries": [
+            {"id": "bash-only", "triggers": ["pre_tool_use"],
+             "command": ["echo", "hi"], "matcher": "^Bash$"},
+            {"id": "any", "triggers": ["pre_tool_use"], "command": ["echo", "a"]},
+        ],
+    }), encoding="utf-8")
+
+    r = Registry.load(reg)
+    matched_bash = [e.id for e in r.entries_for("pre_tool_use", "Bash")]
+    matched_read = [e.id for e in r.entries_for("pre_tool_use", "Read")]
+    matched_none = [e.id for e in r.entries_for("pre_tool_use", None)]
+
+    assert matched_bash == ["bash-only", "any"]
+    assert matched_read == ["any"]
+    assert matched_none == ["any"]
