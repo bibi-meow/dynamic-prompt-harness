@@ -1,7 +1,7 @@
-from .io_contract import AbstractResult, Decision
+from .io_contract import AbstractResult, Decision, Entry
 
 class Composer:
-    def compose(self, results: list[AbstractResult]) -> AbstractResult:
+    def compose(self, results: list[AbstractResult], entries: list[Entry] | None = None) -> AbstractResult:
         if not results:
             return AbstractResult(Decision.ALLOW, None, {})
         denies = [r for r in results if r.decision is Decision.DENY]

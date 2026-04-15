@@ -34,9 +34,7 @@ class Dispatcher:
             for e in entries:
                 r = executor.execute(e, inp)
                 results.append(r)
-                if r.decision is Decision.DENY:
-                    break
-            merged = Composer().compose(results)
+            merged = Composer().compose(results, entries)
             return self._adapter.format_output(merged, trigger)
         except DPHError as e:
             self._logger.log("error", "dispatcher_dph_error", err=str(e), code=e.code)

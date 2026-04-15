@@ -35,3 +35,38 @@ def test_missing_registry_fails_safe_allow(tmp_path):
                         "hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{}})
     out, rc = Dispatcher(base=tmp_path).run_capture("pre_tool_use", stdin)
     assert rc == 0 and out == ""
+
+
+def test_run_capture_evaluates_all_entries_despite_deny(tmp_path, monkeypatch):
+    """Dispatcher must not short-circuit on first DENY; all matching entries run."""
+    import json, sys
+    from dynamic_prompt_harness.dispatcher import Dispatcher
+
+    marker = tmp_path / "second_ran.txt"
+    registry = {
+        "version": 1,
+        "entries": [
+            {
+                "id": "first-deny",
+                "triggers": ["pre_tool_use"],
+                "command": [sys.executable, "-c",
+                           "import json,sys; print(json.dumps({'decision':'deny','message':'first says no'}))"],
+            },
+            {
+                "id": "second-allow",
+                "triggers": ["pre_tool_use"],
+                "command": [sys.executable, "-c",
+                           f"open(r'{marker}','w').write('yes'); "
+                           "import json; print(json.dumps({'decision':'allow'}))"],
+            },
+        ],
+    }
+    reg_path = tmp_path / "registry.json"
+    reg_path.write_text(json.dumps(registry), encoding="utf-8")
+    monkeypatch.setenv("DPH_REGISTRY_PATH", str(reg_path))
+    monkeypatch.setenv("DPH_LOG_PATH", str(tmp_path / "dph.log"))
+
+    d = Dispatcher(tmp_path)
+    d.run_capture("pre_tool_use", json.dumps({"tool_name": "Bash", "tool_input": {}}))
+
+    assert marker.exists(), "second entry must execute even after first DENY"
