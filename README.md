@@ -20,6 +20,8 @@ Install as a Claude Code plugin via the community marketplace:
 /reload-plugins
 ```
 
+> **VSCode extension users:** plugin hooks do not fire in the VSCode native extension due to upstream bug [anthropics/claude-code#18547](https://github.com/anthropics/claude-code/issues/18547). Claude Code CLI is unaffected. See [Known issue](#known-issue-vscode-native-extension-does-not-fire-plugin-hooks) for the workaround.
+
 Then create an empty registry in your project root so dph has something to load:
 
 ```bash
