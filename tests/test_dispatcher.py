@@ -111,3 +111,7 @@ def test_run_capture_emits_single_dph_decision_record(tmp_path, monkeypatch):
     for o in d["per_entry_outcomes"]:
         assert "duration_ms" in o
         assert "decision" in o
+    assert d["per_entry_outcomes"][0]["metadata"] == {"x": 1}
+    assert d["per_entry_outcomes"][1]["metadata"] == {"y": 2}
+    assert d["per_entry_outcomes"][0]["decision"] == "allow"
+    assert d["per_entry_outcomes"][1]["decision"] == "deny"
