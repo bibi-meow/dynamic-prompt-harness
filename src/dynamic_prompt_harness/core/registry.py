@@ -54,6 +54,8 @@ class Registry:
             return True
         if tool is None:
             return False
+        # defensive: id-uniqueness (SchemaValidator E_DUPLICATE_ID) + load() populates
+        # _compiled for every non-None matcher, so this miss path is unreachable in practice.
         pat = self._compiled.get(entry.id)
         if pat is None:
             return False
