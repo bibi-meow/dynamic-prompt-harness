@@ -70,3 +70,44 @@ def test_run_capture_evaluates_all_entries_despite_deny(tmp_path, monkeypatch):
     d.run_capture("pre_tool_use", json.dumps({"tool_name": "Bash", "tool_input": {}}))
 
     assert marker.exists(), "second entry must execute even after first DENY"
+
+
+def test_run_capture_emits_single_dph_decision_record(tmp_path, monkeypatch):
+    import json, sys
+    from dynamic_prompt_harness.dispatcher import Dispatcher
+
+    registry = {
+        "version": 1,
+        "entries": [
+            {"id": "e1", "triggers": ["pre_tool_use"],
+             "command": [sys.executable, "-c",
+                         "import json;print(json.dumps({'decision':'allow','metadata':{'x':1}}))"]},
+            {"id": "e2", "triggers": ["pre_tool_use"],
+             "command": [sys.executable, "-c",
+                         "import json;print(json.dumps({'decision':'deny','message':'nope','metadata':{'y':2}}))"]},
+        ],
+    }
+    reg_path = tmp_path / "registry.json"
+    reg_path.write_text(json.dumps(registry), encoding="utf-8")
+    log_path = tmp_path / "dph.log"
+    monkeypatch.setenv("DPH_REGISTRY_PATH", str(reg_path))
+    monkeypatch.setenv("DPH_LOG_PATH", str(log_path))
+
+    Dispatcher(tmp_path).run_capture("pre_tool_use",
+        json.dumps({"tool_name": "Bash", "tool_input": {}}))
+
+    records = [json.loads(l) for l in log_path.read_text(encoding="utf-8").splitlines()]
+    decisions = [r for r in records if r["event"] == "dph_decision"]
+    assert len(decisions) == 1
+    d = decisions[0]
+    assert d["trigger"] == "pre_tool_use"
+    assert d["matched_entries"] == ["e1", "e2"]
+    assert len(d["per_entry_outcomes"]) == 2
+    ids = [o["id"] for o in d["per_entry_outcomes"]]
+    assert ids == ["e1", "e2"]
+    assert d["final_decision"] == "deny"
+    assert d["final_message"] == "nope"
+    assert isinstance(d["latency_ms"], (int, float))
+    for o in d["per_entry_outcomes"]:
+        assert "duration_ms" in o
+        assert "decision" in o
