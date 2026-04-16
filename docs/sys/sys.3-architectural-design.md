@@ -33,7 +33,7 @@ dynamic-prompt-harness/                   # repo root = plugin root
 │   │   ├── __init__.py
 │   │   ├── registry.py                   # load + JSON Schema validate + trigger/tool/pattern filter
 │   │   ├── executor.py                   # execution of declarative / script
-│   │   ├── composer.py                   # priority sort + DENY short-circuit + hint concatenation
+│   │   ├── composer.py                   # priority sort + full-evaluation aggregation (per_entry metadata, "; "-joined messages)
 │   │   ├── io_contract.py                # AbstractInput / AbstractResult dataclass
 │   │   ├── schema.py                     # registry.json JSON Schema definition
 │   │   └── logger.py                     # JSONL logger + log_level
@@ -96,16 +96,18 @@ Unifying on Python lets us handle Windows / Linux / macOS on a single path (NFR-
       - Secondary narrowing by tools / pattern (FR-012)
 5. composer.sort(filtered)
       - Ascending by priority → ties broken by registry order (FR-013)
-6. for entry in sorted:
+6. for entry in sorted:                    # full evaluation (FR-014)
       result = executor.run(entry, AbstractInput)
       results.append(result)
-      logger.log(entry, result)
-      if result.decision == DENY: break   # short-circuit (FR-014)
-7. final = composer.merge(results)
-      - If any DENY exists, DENY (first-win; already short-circuited)
-      - Otherwise concatenate all hints (FR-015)
-      - If none apply, ALLOW
-8. adapter.format_output(final) → stdout JSON
+      record per-entry outcome (id, decision, message, metadata, duration_ms)
+7. final = composer.merge(results, entries)
+      - metadata.per_entry[entry_id] = entry's metadata (evidence preserved for every entry)
+      - If any DENY exists, DENY; deny messages joined with "; "
+      - Else if any HINT exists, HINT; hint messages joined with "; "
+      - Else ALLOW
+8. logger.log("info", "dph_decision", trigger, matched_entries,
+              per_entry_outcomes, final_decision, final_message, latency_ms)
+9. adapter.format_output(final) → stdout JSON
 ```
 
 ### 3.3 Error policy

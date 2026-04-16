@@ -21,20 +21,20 @@ constraints derived from SYS.1 (user-stories). v0.1 scope.
 | FR-011 | On startup, the dispatcher loads `.claude/dynamic-prompt-harness/registry.json` | B1 |
 | FR-012 | The dispatcher performs coarse filtering of each registry entry by `trigger + tool + pattern`, and only runs matched harnesses as subprocesses | C2 |
 | FR-013 | The dispatcher executes matched harnesses in ascending `priority` order. Ties are resolved by registry declaration order | C3, B3 |
-| FR-014 | Upon detecting `decision = deny` from a harness, the dispatcher skips subsequent harnesses and returns the final result as `deny` (short-circuit) | C3 |
+| FR-014 | The dispatcher evaluates **all** matching entries per trigger (no short-circuit). Per-entry evidence is aggregated as `metadata.per_entry[entry_id]`. The final decision is `deny` if any entry denies; deny messages are joined with `"; "`. Behavior-shift note for entry authors: non-idempotent side effects run even after an upstream DENY — audit for safety | C3 |
 | FR-015 | The dispatcher concatenates all `decision = hint` messages into a single output | C4 |
 | FR-016 | The dispatcher catches abnormal termination (non-zero exit) / malformed JSON output from individual harnesses, skips the offending harness, and continues with the rest. Forced termination on hang is not performed; this is delegated to the Claude Code hook timeout | C5 |
 | FR-017 | The dispatcher records caught anomalies in the log (timestamp / session_id / trigger / harness name / cause / exit code) | C5 |
-| FR-018 | The dispatcher log level (`debug` / `info` / `warn` / `error`) can be switched via the environment variable `DPH_LOG_LEVEL` or the top-level `log_level` field in `registry.json`. Default is `info` | NFR-O |
+| FR-018 | The dispatcher log level (`debug` / `info` / `warning` / `error`; legacy `warn` accepted as alias) can be switched via the environment variable `DPH_LOG_LEVEL` or the top-level `log_level` field in `registry.json`. Default is `info` | NFR-O |
 
 ### 1.3 Registry
 
 | ID | Requirement | Source US |
 |---|---|---|
 | FR-020 | `registry.json` is validated against a JSON Schema. On validation failure, an error message is written to stderr and dispatcher startup is aborted | B4 |
-| FR-021 | A registry entry has the following fields: `name` (required, unique), `triggers` (required, array), `tools` (optional, array), `pattern` (optional, regex string), `priority` (optional, integer, default 100), `enabled` (optional, bool, default true). In addition, it must have exactly one of `script` or `action` (mutually exclusive, required) | B1, B2, B3 |
-| FR-021a | The `action` field represents a declarative harness. Form: `{"on_match": "deny" / "allow" / "hint", "message": "<string>"}`. The dispatcher does not spawn a subprocess; on pattern match it returns this result directly | B5 (declarative extension) |
-| FR-021b | The `script` field represents a custom-implementation harness. Form: a relative path under `.claude/dynamic-prompt-harness/harnesses/`. The dispatcher executes the specified script as a subprocess | B5 |
+| FR-021 | A registry entry has the v1 schema defined in [`docs/reference/registry-schema.md`](../reference/registry-schema.md): `id`, `triggers`, `command`, and optional `matcher` / `priority` / `timeout_sec` / `log_level`. The elicitation-era `name/tools/pattern/action/script` model (FR-021a/b below) was superseded before v0.1.0; `registry-schema.md` is the authoritative contract | B1, B2, B3 |
+| FR-021a | *Historical (not shipped).* Declarative `action` harnesses were part of the initial elicitation but dropped before v0.1.0 in favour of the uniform subprocess contract. Retained for traceability | B5 |
+| FR-021b | *Historical (not shipped).* The `script` vs `action` split was collapsed into the single `command` field (argv) before v0.1.0 | B5 |
 | FR-022 | Entries with `enabled: false` are ignored by the dispatcher | B2 |
 
 ### 1.4 Abstract I/O Contract
@@ -137,7 +137,7 @@ This policy is invariant across v0.1 / v0.2+.
 | ID | Requirement |
 |---|---|
 | NFR-O-001 | Dispatcher execution logs (timestamp / session_id / trigger / harness name / result / error) are appended to `.claude/dynamic-prompt-harness/logs/` in JSONL format |
-| NFR-O-002 | Log level supports the 4 levels `debug` / `info` / `warn` / `error` (FR-018) |
+| NFR-O-002 | Log level supports `debug` / `info` / `warning` / `error` (FR-018); legacy `warn` is accepted as an alias for `warning` |
 | NFR-O-003 | Log rotation / retention period is out of scope in v0.1 (user's responsibility) |
 
 ## 3. Interface Requirements (IR)

@@ -11,9 +11,11 @@
 
 ## Log location
 
-`.claude/dynamic-prompt-harness/logs/dph.log` (JSONL, one decision per
-line). Each record includes the trigger, matched entries, subprocess
-exit codes, stdout, composed decision, and timing.
+`.claude/dynamic-prompt-harness/logs/dph.log` (JSONL). The dispatcher
+emits exactly one `dph_decision` event per invocation, plus per-entry
+error events (`executor_timeout`, `executor_nonzero`, etc.) and
+dispatcher-level error events (`dispatcher_dph_error`, `dispatcher_unknown`)
+when something goes wrong.
 
 ## Log levels
 
@@ -64,18 +66,26 @@ valid `Decision` object. Treated as DENY. Fix the harness's output.
 
 ## Reading `dph.log`
 
-Each line is one JSON object. Useful fields:
+Each line is one JSON object. The `dph_decision` event fields:
 
-- `trigger` — which trigger fired
-- `tool` — tool name
-- `entries` — list of resolved entries with per-entry decision
-- `composed` — the final decision after AND-composition
-- `duration_ms` — total dispatcher time
+- `event` — always `"dph_decision"` for normal decisions
+- `trigger` — which trigger fired (e.g. `"pre_tool_use"`)
+- `matched_entries` — list of entry ids that matched, in execution order
+- `per_entry_outcomes` — per-entry record: `id`, `decision` (`"allow"` / `"deny"` / `"hint"`), `message`, `metadata`, `duration_ms`
+- `final_decision` — aggregated decision after full evaluation
+- `final_message` — `"; "`-joined messages from all denies (or hints)
+- `latency_ms` — total dispatcher wall-time
 
-Filter with jq:
+Filter denies with jq:
 
 ```bash
-jq 'select(.composed.decision == "deny")' .claude/dynamic-prompt-harness/logs/dph.log
+jq 'select(.event=="dph_decision" and .final_decision=="deny")' .claude/dynamic-prompt-harness/logs/dph.log
+```
+
+Dispatcher-level failures use a different event:
+
+```bash
+jq 'select(.event=="dispatcher_dph_error" or .event=="dispatcher_unknown")' .claude/dynamic-prompt-harness/logs/dph.log
 ```
 
 ## Dispatcher is fail-safe

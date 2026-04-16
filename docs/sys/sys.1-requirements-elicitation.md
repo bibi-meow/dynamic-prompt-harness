@@ -13,7 +13,7 @@ ad-hoc; providing templates is a secondary concern.
 | Dispatcher | A single hook receives all triggers |
 | Registry | Centralized `registry.json` |
 | I/O contract | Abstraction layer present (vendor-agnostic) |
-| Composition | Priority + short-circuit; same priority follows registration order |
+| Composition | Priority-ordered full evaluation; all matching entries run; aggregated DENY wins |
 | State | Out of framework scope (implement per-harness if needed) |
 | Language | Python (dispatcher/adapter) |
 | Matcher | Two stages (coarse in registry + fine in harness) |
@@ -88,8 +88,10 @@ before spawning subprocesses.
 
 ### US-C3
 Matching harnesses are executed in priority order; same-priority entries
-follow registration order in `registry.json`. Execution short-circuits on
-the first DENY.
+follow registration order in `registry.json`. **All matching entries are
+evaluated** (no short-circuit) so that every rule contributes evidence;
+the final decision is DENY if any entry denies, HINT if any entry hints
+and none denies, else ALLOW.
 
 ### US-C4
 HINT outputs are concatenated from all harnesses into a single output.
