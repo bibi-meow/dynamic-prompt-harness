@@ -178,8 +178,18 @@ def run(entry: Entry, inp: AbstractInput) -> AbstractResult:
 def sort(entries: list[Entry]) -> list[Entry]:
     """Ascending by priority; ties preserve input order (stable sort)"""
 
-def merge(results: list[AbstractResult]) -> AbstractResult:
-    """DENY first-win / concatenate all hints / ALLOW if none"""
+def compose(
+    results: list[AbstractResult],
+    entries: list[Entry] | None = None,
+) -> AbstractResult:
+    """Full-evaluation aggregation over all matching entries.
+
+    - metadata.per_entry[entry.id] = result.metadata (evidence preserved
+      for every entry, including ALLOWs)
+    - If any DENY, final = DENY; deny messages joined with "; "
+    - Else if any HINT, final = HINT; hint messages joined with "; "
+    - Else ALLOW
+    """
 ```
 
 ### 4.5 `core.schema`
@@ -190,17 +200,29 @@ a `jsonschema`-equivalent using only the standard library (NFR-PT-002: stdlib on
 
 ### 4.6 `core.logger`
 
-JSONL append. One line = one harness execution event.
+JSONL append. The dispatcher emits exactly one `dph_decision` event per
+invocation carrying the aggregated evidence; executor and dispatcher
+errors emit their own error events (`executor_timeout`,
+`executor_nonzero`, `executor_bad_stdout`, `dispatcher_dph_error`,
+`dispatcher_unknown`).
 
 ```json
 {
-  "ts": "2026-04-12T21:55:00+09:00",
-  "session_id": "...",
+  "ts": 1744000000.123,
+  "level": "info",
+  "event": "dph_decision",
   "trigger": "pre_tool_use",
-  "harness": "block-env-file",
-  "decision": "deny",
-  "duration_ms": 12,
-  "error": null
+  "matched_entries": ["block-env-file", "audit-bash"],
+  "per_entry_outcomes": [
+    {"id": "block-env-file", "decision": "deny",
+     "message": "don't touch .env", "metadata": {"rule": "env"},
+     "duration_ms": 12.3},
+    {"id": "audit-bash", "decision": "allow",
+     "message": null, "metadata": {"logged": true}, "duration_ms": 4.1}
+  ],
+  "final_decision": "deny",
+  "final_message": "don't touch .env",
+  "latency_ms": 18.7
 }
 ```
 
