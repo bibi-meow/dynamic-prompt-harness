@@ -1,10 +1,12 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
+
 
 class Decision(str, Enum):
     ALLOW = "allow"
     DENY = "deny"
     HINT = "hint"
+
 
 @dataclass(frozen=True)
 class AbstractInput:
@@ -15,11 +17,13 @@ class AbstractInput:
     prompt: str | None
     context: dict
 
+
 @dataclass(frozen=True)
 class AbstractResult:
     decision: Decision
     message: str | None
     metadata: dict
+
 
 @dataclass(frozen=True)
 class Entry:

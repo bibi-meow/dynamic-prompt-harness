@@ -1,9 +1,13 @@
 from __future__ import annotations
-import json, re
+
+import json
+import re
 from pathlib import Path
+
+from .errors import RegistryError, SchemaError
 from .io_contract import Entry
 from .schema import SchemaValidator
-from .errors import RegistryError, SchemaError
+
 
 class Registry:
     def __init__(self, entries: tuple[Entry, ...], compiled_matchers: dict[str, re.Pattern]):
@@ -11,7 +15,7 @@ class Registry:
         self._compiled = compiled_matchers
 
     @classmethod
-    def load(cls, path: Path) -> "Registry":
+    def load(cls, path: Path) -> Registry:
         try:
             raw = path.read_text(encoding="utf-8")
         except OSError as e:
@@ -27,7 +31,7 @@ class Registry:
 
         entries = tuple(cls._to_entry(d) for d in data["entries"])
         compiled: dict[str, re.Pattern] = {}
-        for d, ent in zip(data["entries"], entries):
+        for _d, ent in zip(data["entries"], entries, strict=False):
             if ent.matcher is not None:
                 # Schema has already validated compilability; safe to compile here.
                 compiled[ent.id] = re.compile(ent.matcher)

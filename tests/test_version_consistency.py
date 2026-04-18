@@ -1,9 +1,9 @@
 """Guard rail: pyproject, plugin.json, and CHANGELOG top entry must agree."""
+
 import json
 import re
 import tomllib
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -29,6 +29,4 @@ def test_all_three_version_sources_agree():
     py = _pyproject_version()
     pl = _plugin_version()
     cl = _changelog_top_version()
-    assert py == pl == cl, (
-        f"version drift: pyproject={py!r} plugin={pl!r} changelog={cl!r}"
-    )
+    assert py == pl == cl, f"version drift: pyproject={py!r} plugin={pl!r} changelog={cl!r}"

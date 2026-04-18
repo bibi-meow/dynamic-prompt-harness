@@ -1,8 +1,10 @@
 import re
+
 from .errors import SchemaError
 
 VALID_TRIGGERS = {"pre_tool_use", "post_tool_use", "user_prompt_submit", "pre_compact"}
 VALID_LOG_LEVELS = {"debug", "info", "warning", "warn", "error"}
+
 
 class SchemaValidator:
     def validate(self, data: dict) -> None:
