@@ -1,9 +1,12 @@
 """End-to-end test: two denies + one allow are ALL evaluated,
 final metadata aggregates per-entry evidence, messages joined with "; "."""
+
 from __future__ import annotations
+
 import json
 import sys
 from pathlib import Path
+
 from dynamic_prompt_harness.dispatcher import Dispatcher
 
 
@@ -15,7 +18,8 @@ def _make_registry(tmp_path: Path) -> Path:
                 "id": "deny-a",
                 "triggers": ["pre_tool_use"],
                 "command": [
-                    sys.executable, "-c",
+                    sys.executable,
+                    "-c",
                     "import json,sys; print(json.dumps({"
                     "'decision':'deny','message':'A violated','metadata':{'rule':'A'}"
                     "}))",
@@ -25,7 +29,8 @@ def _make_registry(tmp_path: Path) -> Path:
                 "id": "allow-ok",
                 "triggers": ["pre_tool_use"],
                 "command": [
-                    sys.executable, "-c",
+                    sys.executable,
+                    "-c",
                     "import json; print(json.dumps({"
                     "'decision':'allow','metadata':{'checked':True}"
                     "}))",
@@ -35,7 +40,8 @@ def _make_registry(tmp_path: Path) -> Path:
                 "id": "deny-c",
                 "triggers": ["pre_tool_use"],
                 "command": [
-                    sys.executable, "-c",
+                    sys.executable,
+                    "-c",
                     "import json; print(json.dumps({"
                     "'decision':'deny','message':'C violated','metadata':{'rule':'C'}"
                     "}))",
@@ -66,7 +72,7 @@ def test_full_evaluation_aggregates_evidence(tmp_path, monkeypatch):
     assert "C violated" in flat
     assert "A violated; C violated" in flat or flat.count("; ") >= 1
 
-    records = [json.loads(l) for l in log_path.read_text(encoding="utf-8").splitlines()]
+    records = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
     decision = next(r for r in records if r["event"] == "dph_decision")
     ids = [o["id"] for o in decision["per_entry_outcomes"]]
     assert ids == ["deny-a", "allow-ok", "deny-c"]

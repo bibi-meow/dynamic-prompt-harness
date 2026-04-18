@@ -1,13 +1,18 @@
 from __future__ import annotations
-import os, sys, time
+
+import os
+import sys
+import time
 from pathlib import Path
+
 from .adapters.claude_code import ClaudeCodeAdapter
-from .core.registry import Registry
-from .core.executor import Executor
 from .core.composer import Composer
-from .core.logger import JsonlLogger
-from .core.io_contract import AbstractResult, Decision
 from .core.errors import DPHError
+from .core.executor import Executor
+from .core.io_contract import AbstractResult, Decision
+from .core.logger import JsonlLogger
+from .core.registry import Registry
+
 
 class Dispatcher:
     def __init__(self, base: Path):
@@ -27,7 +32,8 @@ class Dispatcher:
             inp = self._adapter.parse_input(raw_stdin, trigger)
             if not self._registry_path.exists():
                 return self._adapter.format_output(
-                    AbstractResult(Decision.ALLOW, None, {}), trigger)
+                    AbstractResult(Decision.ALLOW, None, {}), trigger
+                )
             registry = Registry.load(self._registry_path)
             entries = registry.entries_for(trigger, inp.tool)
             executor = Executor(cwd=self._base, logger=self._logger)
@@ -38,17 +44,20 @@ class Dispatcher:
                 r = executor.execute(e, inp)
                 dur_ms = (time.monotonic() - te0) * 1000.0
                 results.append(r)
-                per_entry_outcomes.append({
-                    "id": e.id,
-                    "decision": r.decision.value,
-                    "message": r.message,
-                    "metadata": dict(r.metadata or {}),
-                    "duration_ms": dur_ms,
-                })
+                per_entry_outcomes.append(
+                    {
+                        "id": e.id,
+                        "decision": r.decision.value,
+                        "message": r.message,
+                        "metadata": dict(r.metadata or {}),
+                        "duration_ms": dur_ms,
+                    }
+                )
             merged = Composer().compose(results, entries)
             latency_ms = (time.monotonic() - t0) * 1000.0
             self._logger.log(
-                "info", "dph_decision",
+                "info",
+                "dph_decision",
                 trigger=trigger,
                 matched_entries=[e.id for e in entries],
                 per_entry_outcomes=per_entry_outcomes,

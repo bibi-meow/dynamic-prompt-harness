@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Ruff check
+        run: ruff check src/ tests/
+
+      - name: Ruff format check
+        run: ruff format --check src/ tests/
+
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package with dev dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest tests/ -v
+
+  check-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify zero external dependencies
+        run: |
+          # pyproject.toml の dependencies が空であることを確認
+          python -c "
+          import tomllib, sys
+          with open('pyproject.toml', 'rb') as f:
+              data = tomllib.load(f)
+          deps = data.get('project', {}).get('dependencies', [])
+          if deps:
+              print(f'ERROR: External dependencies found: {deps}', file=sys.stderr)
+              print('This project has a zero-dependency policy (stdlib only).', file=sys.stderr)
+              sys.exit(1)
+          print('OK: No external dependencies declared.')
+          "
+
+      - name: Scan for non-stdlib imports
+        run: |
+          python -c "
+          import ast, sys, importlib.util
+          from pathlib import Path
+
+          # stdlib module list (Python 3.11+)
+          STDLIB = set(sys.stdlib_module_names)
+          # Internal package
+          STDLIB.add('dynamic_prompt_harness')
+
+          errors = []
+          for p in sorted(Path('src').rglob('*.py')):
+              try:
+                  tree = ast.parse(p.read_text(encoding='utf-8'))
+              except SyntaxError:
+                  continue
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      for alias in node.names:
+                          top = alias.name.split('.')[0]
+                          if top not in STDLIB:
+                              errors.append(f'{p}:{node.lineno}: import {alias.name}')
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      if node.level > 0:
+                          continue  # skip relative imports
+                      top = node.module.split('.')[0]
+                      if top not in STDLIB:
+                          errors.append(f'{p}:{node.lineno}: from {node.module}')
+
+          if errors:
+              print('ERROR: Non-stdlib imports detected:', file=sys.stderr)
+              for e in errors:
+                  print(f'  {e}', file=sys.stderr)
+              sys.exit(1)
+          print('OK: All imports are stdlib or internal.')
+          "

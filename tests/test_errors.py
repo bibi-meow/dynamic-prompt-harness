@@ -1,10 +1,16 @@
 from dynamic_prompt_harness.core.errors import (
-    DPHError, RegistryError, ExecutionError, SchemaError, AdapterError,
+    AdapterError,
+    DPHError,
+    ExecutionError,
+    RegistryError,
+    SchemaError,
 )
+
 
 def test_hierarchy():
     for cls in (RegistryError, ExecutionError, SchemaError, AdapterError):
         assert issubclass(cls, DPHError)
+
 
 def test_fields():
     e = DPHError("boom", code="X1", detail={"k": "v"})

@@ -1,13 +1,18 @@
 from .io_contract import AbstractResult, Decision, Entry
 
+
 class Composer:
-    def compose(self, results: list[AbstractResult], entries: list[Entry] | None = None) -> AbstractResult:
+    def compose(
+        self,
+        results: list[AbstractResult],
+        entries: list[Entry] | None = None,
+    ) -> AbstractResult:
         if not results:
             return AbstractResult(Decision.ALLOW, None, {})
 
         per_entry: dict[str, dict] = {}
         if entries is not None and len(entries) == len(results):
-            for ent, res in zip(entries, results):
+            for ent, res in zip(entries, results, strict=False):
                 per_entry[ent.id] = dict(res.metadata or {})
         meta = {"per_entry": per_entry} if per_entry else {}
 

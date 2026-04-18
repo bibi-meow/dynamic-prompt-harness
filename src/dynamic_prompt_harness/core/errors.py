@@ -4,7 +4,18 @@ class DPHError(Exception):
         self.code = code
         self.detail = detail or {}
 
-class RegistryError(DPHError): pass
-class ExecutionError(DPHError): pass
-class SchemaError(DPHError): pass
-class AdapterError(DPHError): pass
+
+class RegistryError(DPHError):
+    pass
+
+
+class ExecutionError(DPHError):
+    pass
+
+
+class SchemaError(DPHError):
+    pass
+
+
+class AdapterError(DPHError):
+    pass

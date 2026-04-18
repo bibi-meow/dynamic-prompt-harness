@@ -1,8 +1,10 @@
-import json, time
+import json
+import time
 from pathlib import Path
 
 # Canonical spelling is "warning"; "warn" kept as backward-compat alias.
 _ORDER = {"debug": 10, "info": 20, "warning": 30, "warn": 30, "error": 40, "critical": 50}
+
 
 class JsonlLogger:
     def __init__(self, path: Path, level: str = "info"):
