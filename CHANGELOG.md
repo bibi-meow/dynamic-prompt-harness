@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-04-18
+
+### Added
+- GitHub Actions CI: lint (ruff), test (pytest matrix: ubuntu/windows × 3.11-3.13), zero-dependency guard (pyproject.toml + AST scan). (PR #1 by cicd)
+- Ruff configuration: E/F/W/I/N/UP/B/SIM rules, line-length 100, target-version py311.
+
+### Fixed
+- **Windows cp932 mojibake**: Executor now uses `encoding="utf-8"` and `PYTHONIOENCODING=utf-8` for subprocess communication. Adapter `format_output` uses `ensure_ascii=True` to keep `\uXXXX` escapes through the full pipeline.
+- Test environment isolation: `monkeypatch.delenv("DPH_REGISTRY_PATH")` prevents host env vars from interfering with test registry paths.
+
+### Changed
+- All source and test files reformatted with ruff format.
+- Import ordering normalized (isort).
+- Minor code improvements: `pytest.raises(Exception)` → `pytest.raises(AttributeError)`, unused variable `d` → `_d`, explicit `strict=False` on `zip()`.
+
 ## [0.1.2] - 2026-04-13
 
 ### Changed

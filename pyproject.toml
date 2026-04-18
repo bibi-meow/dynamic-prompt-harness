@@ -1,6 +1,6 @@
 [project]
 name = "dynamic-prompt-harness"
-version = "0.1.2"
+version = "0.1.3"
 description = "Vendor-neutral hook dispatcher for Claude Code and other agents"
 requires-python = ">=3.11"
 dependencies = []
